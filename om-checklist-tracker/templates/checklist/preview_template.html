@@ -1,0 +1,129 @@
+{% extends 'base.html' %}
+{% block title %}Preview: {{ template.name }} · O&amp;M{% endblock %}
+{% block content %}
+<div class="crumb">
+  <a href="{% url 'manage-checklists' %}">← Back to Checklists</a>
+</div>
+
+<div class="page-heading">
+  <div>
+    <div class="eyebrow">TEMPLATE PREVIEW · VERSION {{ template.version }}</div>
+    <h1>{{ template.name }}</h1>
+    <p>
+      {% if template.document_number %}Doc: {{ template.document_number }} · {% endif %}
+      {% if template.company %}{{ template.company }} · {% endif %}
+      {% if template.equipment_name %}Equipment: {{ template.equipment_name }} · {% endif %}
+      Read-only preview of all checkpoints configured for this checklist template.
+    </p>
+  </div>
+  <div style="display: flex; gap: 0.75rem; align-items: center;">
+    {% if template.active %}
+      <span class="badge success">Active</span>
+    {% else %}
+      <span class="badge pending">Inactive</span>
+    {% endif %}
+    <a href="{% url 'manage-checklists' %}" class="button secondary">← Back to Checklists</a>
+  </div>
+</div>
+
+<div class="stats-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 24px;">
+  <div class="stat-card">
+    <span>TOTAL CHECKPOINTS</span>
+    <strong>{{ total_items }}</strong>
+    <small>Fillable checks in this template</small>
+  </div>
+  <div class="stat-card">
+    <span>SECTIONS</span>
+    <strong>{{ total_sections }}</strong>
+    <small>Distinct categories/equipment areas</small>
+  </div>
+  <div class="stat-card">
+    <span>INPUT TYPES</span>
+    <strong style="font-size: 18px; margin-top: 8px;">
+      {{ num_boolean }} <span style="font-size: 11px; font-weight: normal; color: var(--muted);">Boolean</span> ·
+      {{ num_numeric }} <span style="font-size: 11px; font-weight: normal; color: var(--muted);">Number</span> ·
+      {{ num_text }} <span style="font-size: 11px; font-weight: normal; color: var(--muted);">Text</span>
+    </strong>
+    <small>Response formats required</small>
+  </div>
+  <div class="stat-card">
+    <span>ASSIGNED SITES</span>
+    <strong>{{ assigned_sites|length }}</strong>
+    <small>
+      {% for sc in assigned_sites %}
+        {{ sc.site.name }}{% if not forloop.last %}, {% endif %}
+      {% empty %}
+        Used as default fallback
+      {% endfor %}
+    </small>
+  </div>
+</div>
+
+<section class="panel">
+  <div class="panel-head">
+    <div>
+      <h2>Checklist checkpoints ({{ total_items }})</h2>
+      <p>Organized by section in the exact order operators will view and complete them.</p>
+    </div>
+  </div>
+
+  {% if total_items == 0 %}
+    <div style="padding: 40px; text-align: center; color: var(--muted);">
+      <p style="font-size: 15px; margin-bottom: 12px;"><strong>No checkpoints found in this template.</strong></p>
+      <p style="font-size: 12px; margin-bottom: 18px;">This can occur if an earlier upload used an unsupported table format. You can delete this template from the Checklists tab and re-upload the file with the improved parser.</p>
+      <a href="{% url 'manage-checklists' %}" class="button primary">Go to Checklists &amp; Re-upload</a>
+    </div>
+  {% else %}
+    {% for section_name, section_items in sections_map %}
+      <div style="margin-bottom: 24px;">
+        <div style="display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: #f2f6f4; border-radius: 8px; margin-bottom: 8px; border-left: 4px solid var(--green);">
+          <strong style="color: var(--ink); font-size: 13px;">{{ section_name }}</strong>
+          <span class="badge" style="background: #e3ede7; color: var(--green-dark);">{{ section_items|length }} checks</span>
+        </div>
+
+        <div class="table-wrap">
+          <table class="review-table">
+            <thead>
+              <tr>
+                <th style="width: 45px;">No.</th>
+                <th>Check / Observation</th>
+                <th>Standard / Acceptance Criteria</th>
+                <th>Method / Tool</th>
+                <th>Freq.</th>
+                <th>Type</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in section_items %}
+                <tr>
+                  <td><strong>#{{ item.checkpoint_no|stringformat:"02d" }}</strong></td>
+                  <td>
+                    <strong>{{ item.description }}</strong>
+                  </td>
+                  <td>{{ item.standard|default:"—" }}</td>
+                  <td>{{ item.method|default:"Visual / Manual" }}</td>
+                  <td>{{ item.frequency|default:"Daily" }}</td>
+                  <td>
+                    {% if item.answer_type == 'boolean' %}
+                      <span class="badge" style="background: #e8f5ef; color: #18835e;">Yes / No</span>
+                    {% elif item.answer_type == 'number' %}
+                      <span class="badge" style="background: #edf4fa; color: #1b639e;">Number{% if item.unit %} ({{ item.unit }}){% endif %}</span>
+                    {% else %}
+                      <span class="badge" style="background: #f7f7f7; color: #5a6b65;">Text</span>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    {% endfor %}
+  {% endif %}
+</section>
+
+<div class="panel-foot" style="margin-top: 20px;">
+  <a href="{% url 'manage-checklists' %}" class="button secondary">← Back to Checklists</a>
+  <a href="{% url 'manage-sites' %}" class="button primary">Assign to Sites →</a>
+</div>
+{% endblock %}

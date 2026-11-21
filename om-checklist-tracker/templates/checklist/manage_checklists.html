@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+{% block title %}Checklists · O&amp;M{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <div class="eyebrow">ADMINISTRATION</div>
+    <h1>Checklist templates</h1>
+    <p>Upload new checklists in Excel (.xlsx) or PDF format and assign them to sites for daily operator entry.</p>
+  </div>
+</div>
+
+<div class="admin-tabs">
+  <a class="admin-tab" href="{% url 'manage-users' %}">Users</a>
+  <a class="admin-tab" href="{% url 'manage-sites' %}">Sites</a>
+  <a class="admin-tab active" href="{% url 'manage-checklists' %}">Checklists</a>
+</div>
+
+<div class="split-layout">
+  <section class="panel">
+    <div class="panel-head">
+      <div>
+        <h2>Configured checklists</h2>
+        <p>{{ templates|length }} templates available</p>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Template name</th>
+            <th>Checkpoints</th>
+            <th>Assigned sites</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for template in templates %}
+          <tr>
+            <td>
+              <a href="{% url 'preview-checklist-template' template.id %}" style="color: var(--ink); text-decoration: none;">
+                <strong>{{ template.name }}</strong>
+              </a>
+              <small>Version {{ template.version }}{% if template.document_number %} · Doc: {{ template.document_number }}{% endif %}</small>
+            </td>
+            <td>
+              <span class="badge">{{ template.items.count }} checks</span>
+            </td>
+            <td>
+              {% for sc in template.site_checklists.all %}
+                <span class="site-tag">{{ sc.site.name }}</span>{% if not forloop.last %} {% endif %}
+              {% empty %}
+                <span class="muted">All sites (fallback)</span>
+              {% endfor %}
+            </td>
+            <td>
+              {% if template.active %}
+                <span class="badge success">Active</span>
+              {% else %}
+                <span class="badge pending">Inactive</span>
+              {% endif %}
+            </td>
+            <td>
+              <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <a href="{% url 'preview-checklist-template' template.id %}" class="button secondary small" style="padding: 4px 10px; font-size: 11px;">Preview</a>
+                <form method="post" action="{% url 'delete-checklist-template' template.id %}" onsubmit="return confirm('Archive or remove this checklist template?');" style="display:inline; margin: 0;">
+                  {% csrf_token %}
+                  <button type="submit" class="danger-link" style="font-size: 11px;">Remove</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5" class="empty">No checklist templates uploaded yet. Use the upload form to add your first checklist.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel create-panel">
+    <h2>Upload new checklist</h2>
+    <p>Upload an Excel (.xlsx) or PDF file. The system will convert it into a fillable digital checklist for operators.</p>
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      <label for="{{ form.template_name.id_for_label }}">Checklist name</label>
+      {{ form.template_name }}
+      {% for error in form.template_name.errors %}
+        <small class="field-error">{{ error }}</small>
+      {% endfor %}
+
+      <label for="{{ form.file.id_for_label }}" style="margin-top: 1rem;">Checklist file (Excel .xlsx or PDF)</label>
+      {{ form.file }}
+      {% for error in form.file.errors %}
+        <small class="field-error">{{ error }}</small>
+      {% endfor %}
+
+      <div style="margin-top: 1rem;">
+        <label>Assign to sites immediately (optional):</label>
+        <div class="checkbox-list">
+          {% for checkbox in form.assign_to_sites %}
+            <label class="checkbox-item">{{ checkbox.tag }} {{ checkbox.choice_label }}</label>
+          {% endfor %}
+        </div>
+      </div>
+
+      <button class="button primary full" style="margin-top: 1.25rem;">Upload &amp; Convert</button>
+    </form>
+  </section>
+</div>
+{% endblock %}

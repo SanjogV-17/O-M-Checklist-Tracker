@@ -1,0 +1,171 @@
+{% extends 'base.html' %}
+{% block title %}My checklist · O&amp;M{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <div class="eyebrow">OPERATIONS · {{ today|date:'l, d F Y' }}</div>
+    <h1>Daily site checklist</h1>
+    <p>Record and submit daily observations for your assigned solar site.</p>
+  </div>
+  <div class="deadline-chip">
+    <span class="pulse"></span> Due by <strong>{{ deadline|time:'H:i' }} IST</strong>
+  </div>
+</div>
+
+<section class="site-banner">
+  <div>
+    <div class="eyebrow light">YOUR ASSIGNED SITE</div>
+    <h2>{{ site.name }}</h2>
+    <p>
+      {% for equipment in site.equipment.all %}
+        {{ equipment.name }}{% if not forloop.last %}, {% endif %}
+      {% empty %}
+        Equipment not specified
+      {% endfor %}
+      {% if site.location %} <span>·</span> {{ site.location }}{% endif %}
+    </p>
+  </div>
+  <div class="sun-icon">☼</div>
+</section>
+
+{% if all_done %}
+  <section class="panel submitted-panel">
+    <div class="submitted-check">✓</div>
+    <div>
+      <span class="badge success">Complete</span>
+      <h2>All today's checklists are submitted</h2>
+      <p>All required daily checklists for {{ site.name }} have been locked and submitted for today. Submissions are read-only.</p>
+    </div>
+  </section>
+{% elif open %}
+  {% if eligible_count == 1 and next_template %}
+    <section class="panel start-panel">
+      <div>
+        <span class="badge pending" style="margin-bottom: 0.5rem;">Ready to fill</span>
+        <h2>Ready for: {{ next_template.name }}</h2>
+        <p>Complete observations before {{ deadline|time:'H:i' }} IST.</p>
+      </div>
+      <a class="button primary" href="{% url 'checklist-form' %}?template_id={{ next_template.id }}">
+        Fill checklist <span>→</span>
+      </a>
+    </section>
+  {% elif eligible_count > 1 %}
+    <section class="panel start-panel">
+      <div>
+        <span class="badge pending" style="margin-bottom: 0.5rem;">{{ eligible_count }} checklists ready</span>
+        <h2>Choose a checklist to fill</h2>
+        <p>Use the “Fill now” action beside any available checklist below. Submit all checklists before {{ deadline|time:'H:i' }} IST.</p>
+      </div>
+    </section>
+  {% endif %}
+{% else %}
+  <section class="panel locked-panel">
+    <div class="lock-icon">⌑</div>
+    <div>
+      <span class="badge pending">Submission locked</span>
+      <h2>Today's cutoff has passed</h2>
+      <p>The daily checklist can no longer be submitted. Contact your administrator if you need help.</p>
+    </div>
+  </section>
+{% endif %}
+
+<!-- Today's Checklists Sequence Panel -->
+<section class="panel">
+  <div class="panel-head">
+    <div>
+      <h2>Today's checklists</h2>
+      <p>Assigned checklists are reused daily and reset at midnight IST. Complete unsequenced checks in any order; numbered checks follow the admin sequence.</p>
+    </div>
+    <span class="date-label">{{ today|date:'d M Y' }}</span>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Sequence</th>
+          <th>Checklist</th>
+          <th>Status</th>
+          <th>Submitted at</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in checklist_status_list %}
+          <tr>
+            <td>
+              {% if item.position == 0 or item.position == None %}
+                <span class="badge">Any order</span>
+              {% else %}
+                <strong>#{{ item.position }}</strong>
+              {% endif %}
+            </td>
+            <td>
+              <strong>{{ item.template.name }}</strong>
+              <small>{{ item.template.items.count }} checkpoints</small>
+            </td>
+            <td>
+              {% if item.submission %}
+                <span class="badge success">● Submitted</span>
+              {% elif item.available and open %}
+                <span class="badge pending">● Ready to fill</span>
+              {% elif open %}
+                <span class="badge pending" style="opacity: 0.7;">Upcoming</span>
+              {% else %}
+                <span class="badge pending">Locked</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if item.submission %}
+                {{ item.submission.submitted_at|date:'H:i' }} IST
+              {% else %}
+                <span class="muted">—</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if item.submission %}
+                <div class="download-links">
+                  <a class="table-action" href="{% url 'submission-review' item.submission.id %}">Review</a>
+                  <a href="{% url 'operator-excel-review' item.submission.id %}">Excel</a>
+                </div>
+              {% elif item.available and open %}
+                <a class="button primary" style="padding: 0.35rem 0.75rem; font-size: 0.85rem;" href="{% url 'checklist-form' %}?template_id={{ item.template.id }}">Fill now →</a>
+              {% else %}
+                <span class="muted">—</span>
+              {% endif %}
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="5" class="empty">No checklists configured for this site yet.</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="panel-head">
+    <div>
+      <h2>Recent activity</h2>
+      <p>Your site's submitted checklists</p>
+    </div>
+    <a href="{% url 'history' %}" class="text-link">View all history →</a>
+  </div>
+  {% for item in checklist_status_list %}
+    {% if item.submission %}
+      <div class="activity-row">
+        <span class="activity-dot"></span>
+        <div>
+          <strong>{{ item.template.name }} submitted</strong>
+          <small>{{ today|date:'d M Y' }} · {{ item.submission.submitted_at|date:'H:i' }} IST · {{ site.name }}</small>
+        </div>
+        <span class="badge success">Complete</span>
+      </div>
+    {% endif %}
+  {% empty %}
+    <p class="muted small" style="padding: 1rem;">No activity yet.</p>
+  {% endfor %}
+</section>
+{% endblock %}

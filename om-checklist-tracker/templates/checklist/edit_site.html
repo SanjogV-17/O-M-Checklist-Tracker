@@ -1,0 +1,99 @@
+{% extends 'base.html' %}
+{% block title %}Edit site · O&amp;M{% endblock %}
+{% block content %}
+<div class="crumb"><a href="{% url 'manage-sites' %}">← Sites</a></div>
+<div class="page-heading">
+  <div>
+    <div class="eyebrow">SITE MANAGEMENT</div>
+    <h1>Edit {{ site.name }}</h1>
+    <p>Update site details, configure checklist sequence, and maintain the site's equipment inventory.</p>
+  </div>
+</div>
+
+<div class="split-layout">
+  <section class="panel settings-panel">
+    <h2>Site details</h2>
+    <form method="post">
+      {% csrf_token %}
+      {% for field in form %}
+        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+        {{ field }}
+        {% for error in field.errors %}
+          <small class="field-error">{{ error }}</small>
+        {% endfor %}
+      {% endfor %}
+      <button class="button primary" type="submit">Save site details</button>
+    </form>
+
+    <div style="margin-top: 2rem; border-top: 1px solid var(--border, #cbd5d1); padding-top: 1.5rem;">
+      <h2>Assigned checklists</h2>
+      <p>Sequence 0 checklists are available in any order. For a checklist sequence, assign positive numbers; operators can fill the lowest outstanding number first. Unsequenced checklists remain available alongside the next sequenced checklist.</p>
+
+      <div class="equipment-list" style="margin-bottom: 1.5rem;">
+        {% for sc in site_checklists %}
+          <div class="equipment-row">
+            <div>
+              <strong>{% if sc.position == 0 %}Any order{% else %}Sequence #{{ sc.position }}{% endif %} · {{ sc.template.name }}</strong>
+              <small>{{ sc.template.items.count }} checks · {% if sc.active %}Active{% else %}Inactive{% endif %}</small>
+            </div>
+            <div style="display: flex; gap: 0.75rem; align-items: center;">
+              <a href="{% url 'preview-checklist-template' sc.template.id %}" class="button secondary small" style="padding: 3px 8px; font-size: 11px;">Preview</a>
+              <form method="post" action="{% url 'remove-site-checklist' site.id sc.id %}" onsubmit="return confirm('Remove {{ sc.template.name|escapejs }} from this site?')">
+                {% csrf_token %}
+                <button class="link-button danger-link" type="submit">Remove</button>
+              </form>
+            </div>
+          </div>
+        {% empty %}
+          <p class="muted small">No specific checklists assigned. This site will use the default active checklist template.</p>
+        {% endfor %}
+      </div>
+
+      <h3>Assign another checklist</h3>
+      <form method="post" action="{% url 'assign-site-checklist' site.id %}">
+        {% csrf_token %}
+        <label for="{{ checklist_assign_form.template.id_for_label }}">Select template</label>
+        {{ checklist_assign_form.template }}
+
+        <div style="display: flex; gap: 1rem; align-items: flex-end; margin-top: 0.75rem;">
+          <div style="flex: 1;">
+            <label for="{{ checklist_assign_form.position.id_for_label }}">Sequence (0 = any order)</label>
+            {{ checklist_assign_form.position }}
+            <small class="muted">{{ checklist_assign_form.position.help_text }}</small>
+          </div>
+          <div style="margin-bottom: 0.5rem;">
+            <label>{{ checklist_assign_form.active }} Active</label>
+          </div>
+        </div>
+        <button class="button secondary full" style="margin-top: 1rem;" type="submit">Assign checklist to site</button>
+      </form>
+    </div>
+  </section>
+
+  <section class="panel create-panel">
+    <h2>Equipment inventory</h2>
+    <p>Informational list only; it does not alter checklist items.</p>
+    <form method="post" action="{% url 'add-site-equipment' site.id %}">
+      {% csrf_token %}
+      {{ equipment_form.name }}
+      {% for error in equipment_form.name.errors %}
+        <small class="field-error">{{ error }}</small>
+      {% endfor %}
+      <button class="button secondary full" type="submit">Add equipment</button>
+    </form>
+    <div class="equipment-list">
+      {% for equipment in site.equipment.all %}
+        <div class="equipment-row">
+          <span>{{ equipment.name }}</span>
+          <form method="post" action="{% url 'remove-site-equipment' site.id equipment.id %}" onsubmit="return confirm('Remove {{ equipment.name|escapejs }} from this site?')">
+            {% csrf_token %}
+            <button class="link-button danger-link" type="submit">Remove</button>
+          </form>
+        </div>
+      {% empty %}
+        <p class="muted small">No equipment listed yet.</p>
+      {% endfor %}
+    </div>
+  </section>
+</div>
+{% endblock %}

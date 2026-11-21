@@ -1,0 +1,244 @@
+{% extends 'base.html' %}
+{% block title %}Admin dashboard · O&amp;M{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <div class="eyebrow">OVERVIEW · {{ today|date:'l, d F Y' }}</div>
+    <h1>Good day, {{ request.user.first_name|default:request.user.username }}</h1>
+    <p>Track site submissions, review observations inline, and spot anything outstanding.</p>
+  </div>
+  <div class="deadline-chip">
+    <span class="pulse"></span> Daily cutoff <strong>{{ deadline|time:'H:i' }} IST</strong>
+  </div>
+</div>
+
+<div class="stats-grid">
+  <article class="stat-card">
+    <span>Active sites</span>
+    <strong>{{ rows|length }}</strong>
+    <small>Assigned operations coverage</small>
+  </article>
+  <article class="stat-card">
+    <span>Completed sites</span>
+    <strong><span id="submitted-count">0</span></strong>
+    <small>All checklists received today</small>
+  </article>
+  <article class="stat-card">
+    <span>Awaiting submission</span>
+    <strong id="pending-count">0</strong>
+    <small>Sites to follow up</small>
+  </article>
+</div>
+
+<section class="panel">
+  <div class="panel-head" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; border-bottom: 1px solid var(--border, #cbd5d1); padding-bottom: 1rem; margin-bottom: 1rem;">
+    <div>
+      <h2 style="margin: 0;">Site status</h2>
+      <p style="margin: 0.25rem 0 0 0;">Submission progress and inline operational observations across solar sites</p>
+    </div>
+    <div class="admin-tabs" style="margin-bottom: 0;">
+      <a class="admin-tab {% if active_tab != 'review' %}active{% endif %}" href="?tab=status">Today's status</a>
+      <a class="admin-tab {% if active_tab == 'review' %}active{% endif %}" href="?tab=review">Review (inline)</a>
+    </div>
+  </div>
+
+  {% if active_tab == 'review' %}
+    <!-- Review Tab (Inline View for Same Day or Multiple Days without downloading) -->
+    <div style="background: var(--surface-subtle, #f8faf9); padding: 1rem 1.25rem; border-radius: 8px; margin-bottom: 1.5rem; border: 1px solid var(--border, #cbd5d1);">
+      <form method="get" style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end;">
+        <input type="hidden" name="tab" value="review">
+        <div style="flex: 1; min-width: 180px;">
+          <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.35rem;">Site</label>
+          <select name="site" style="width: 100%; padding: 0.5rem; border-radius: 6px; border: 1px solid #cbd5d1;">
+            <option value="">All active sites</option>
+            {% for site in all_sites %}
+              <option value="{{ site.id }}" {% if review_site_id == site.id|stringformat:'s' %}selected{% endif %}>{{ site.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div style="min-width: 150px;">
+          <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.35rem;">From date</label>
+          <input type="date" name="start_date" value="{{ start_date|date:'Y-m-d' }}" style="width: 100%; padding: 0.45rem; border-radius: 6px; border: 1px solid #cbd5d1;">
+        </div>
+        <div style="min-width: 150px;">
+          <label style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.35rem;">To date</label>
+          <input type="date" name="end_date" value="{{ end_date|date:'Y-m-d' }}" style="width: 100%; padding: 0.45rem; border-radius: 6px; border: 1px solid #cbd5d1;">
+        </div>
+        <div>
+          <button class="button primary" style="padding: 0.5rem 1.25rem;" type="submit">Filter review</button>
+        </div>
+        <div style="display: flex; gap: 0.5rem; align-self: flex-end;">
+          <a class="button secondary" style="padding: 0.5rem 0.75rem; font-size: 0.85rem;" href="?tab=review&start_date={{ today|date:'Y-m-d' }}&end_date={{ today|date:'Y-m-d' }}">Today</a>
+          <a class="button secondary" style="padding: 0.5rem 0.75rem; font-size: 0.85rem;" href="?tab=review&site={{ review_site_id }}">All days</a>
+        </div>
+      </form>
+    </div>
+
+    {% if review_submissions %}
+      <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+        {% for sub in review_submissions %}
+          <article class="panel" style="border: 1px solid #cbd5d1; border-radius: 8px; overflow: hidden; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
+            <div style="background: #f1f5f3; padding: 1rem 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; border-bottom: 1px solid #cbd5d1;">
+              <div>
+                <strong style="font-size: 1.1rem; color: #123b32;">{{ sub.site.name }}</strong>
+                <span class="badge success" style="margin-left: 0.5rem;">● Submitted</span>
+                <div style="font-size: 0.85rem; color: #536b63; margin-top: 0.2rem;">
+                  <strong>Checklist:</strong> {{ sub.template.name }} &nbsp;·&nbsp;
+                  <strong>Date:</strong> {{ sub.checklist_date|date:'d M Y' }} &nbsp;·&nbsp;
+                  <strong>Submitted by:</strong> {{ sub.signer_name|default:sub.submitted_by.username }} at {{ sub.submitted_at|date:'H:i' }} IST
+                  {% if sub.equipment_snapshot %} &nbsp;·&nbsp; <strong>Equipment:</strong> {{ sub.equipment_snapshot }}{% endif %}
+                </div>
+              </div>
+              <div class="download-links">
+                <a class="table-action" href="{% url 'submission-review' sub.id %}">Full review page</a>
+                <a href="{% url 'export-submission' sub.id 'xlsx' %}">Excel</a>
+                <a href="{% url 'export-submission' sub.id 'pdf' %}">PDF</a>
+              </div>
+            </div>
+
+            <div class="table-wrap" style="max-height: 400px; overflow-y: auto;">
+              <table class="review-table">
+                <thead>
+                  <tr style="position: sticky; top: 0; background: #fafbfc; z-index: 1;">
+                    <th style="width: 50px;">#</th>
+                    <th>Section / Observation</th>
+                    <th>Standard</th>
+                    <th>Reading / Value</th>
+                    <th>Operator Comment</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for answer in sub.answers.all %}
+                    <tr>
+                      <td>{{ answer.item.checkpoint_no|stringformat:'02d' }}</td>
+                      <td>
+                        <strong>{{ answer.item.description }}</strong>
+                        {% if answer.item.section %}<small>{{ answer.item.section }}</small>{% endif %}
+                      </td>
+                      <td><span class="muted">{{ answer.item.standard|default:'—' }}</span></td>
+                      <td>
+                        <strong>{{ answer.value|default:'—' }}</strong>
+                        {% if answer.item.unit and answer.value %}<span class="unit-tag">{{ answer.item.unit }}</span>{% endif %}
+                      </td>
+                      <td>{{ answer.comment|default:'<span class="muted">—</span>'|safe }}</td>
+                    </tr>
+                  {% empty %}
+                    <tr>
+                      <td colspan="5" class="empty">No checkpoint answers recorded.</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+
+            {% if sub.remarks %}
+              <div style="padding: 0.75rem 1.25rem; background: #fafbfc; border-top: 1px solid #e2e8f0; font-size: 0.9rem;">
+                <strong>Remarks:</strong> <span>{{ sub.remarks }}</span>
+              </div>
+            {% endif %}
+          </article>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div style="text-align: center; padding: 3rem 1rem; color: #64748b;">
+        <p style="font-size: 1.1rem; margin-bottom: 0.5rem;">No submissions found for the selected filter.</p>
+        <small>Try selecting a broader date range or choosing "All active sites".</small>
+      </div>
+    {% endif %}
+
+  {% else %}
+    <!-- Today's Status Tab (Standard overview) -->
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Site / equipment</th>
+            <th>Assigned user</th>
+            <th>Checklists status</th>
+            <th>Latest submission</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+            <tr data-is-complete="{% if row.is_complete %}true{% else %}false{% endif %}">
+              <td>
+                <strong>{{ row.site.name }}</strong>
+                <small>
+                  {% for equipment in row.site.equipment.all %}
+                    {{ equipment.name }}{% if not forloop.last %}, {% endif %}
+                  {% empty %}
+                    Equipment not specified
+                  {% endfor %}
+                </small>
+              </td>
+              <td>
+                {% if row.first_submission %}
+                  {{ row.first_submission.submitted_by.get_full_name|default:row.first_submission.submitted_by.username }}
+                {% else %}
+                  {% if row.site.user_assignment %}
+                    {{ row.site.user_assignment.user.get_full_name|default:row.site.user_assignment.user.username }}
+                  {% else %}
+                    <span class="muted">Unassigned</span>
+                  {% endif %}
+                {% endif %}
+              </td>
+              <td>
+                {% if row.is_complete %}
+                  <span class="badge success">● Submitted ({{ row.completed_count }}/{{ row.total_required }})</span>
+                {% elif row.completed_count > 0 %}
+                  <span class="badge pending">● In progress ({{ row.completed_count }}/{{ row.total_required }})</span>
+                {% else %}
+                  <span class="badge pending">● Pending (0/{{ row.total_required }})</span>
+                {% endif %}
+                {% if row.assigned_checklists %}
+                  <div style="font-size: 0.75rem; color: #64748b; margin-top: 0.25rem;">
+                    {% for sc in row.assigned_checklists %}
+                      {{ sc.template.name }}{% if not forloop.last %}, {% endif %}
+                    {% endfor %}
+                  </div>
+                {% endif %}
+              </td>
+              <td>
+                {% if row.first_submission %}
+                  {{ row.first_submission.submitted_at|date:'H:i' }} IST
+                {% else %}
+                  <span class="muted">—</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if row.submissions %}
+                  <div class="download-links">
+                    <a class="table-action" href="?tab=review&site={{ row.site.id }}&start_date={{ today|date:'Y-m-d' }}&end_date={{ today|date:'Y-m-d' }}">Inline review</a>
+                    <a href="{% url 'export-submission' row.first_submission.id 'xlsx' %}">Excel</a>
+                    <a href="{% url 'export-submission' row.first_submission.id 'pdf' %}">PDF</a>
+                  </div>
+                {% else %}
+                  <span class="muted">—</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="5" class="empty">No active sites yet. <a href="{% url 'manage-sites' %}">Add your first site</a> to get started.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="panel-foot">
+      <span>Cutoff at {{ deadline|time:'H:i' }} IST</span>
+      <a href="{% url 'history' %}">View submission history →</a>
+    </div>
+  {% endif %}
+</section>
+
+<script>
+  const statusRows = [...document.querySelectorAll('tbody tr[data-is-complete]')];
+  const submittedCount = statusRows.filter(r => r.getAttribute('data-is-complete') === 'true').length;
+  const subEl = document.getElementById('submitted-count');
+  const pendEl = document.getElementById('pending-count');
+  if (subEl) subEl.textContent = submittedCount;
+  if (pendEl) pendEl.textContent = Math.max(0, statusRows.length - submittedCount);
+</script>
+{% endblock %}

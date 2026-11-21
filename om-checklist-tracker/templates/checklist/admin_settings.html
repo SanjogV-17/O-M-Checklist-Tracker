@@ -1,0 +1,100 @@
+{% extends 'base.html' %}
+{% block title %}Settings · O&amp;M{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div>
+    <div class="eyebrow">ADMINISTRATION</div>
+    <h1>System settings</h1>
+    <p>Manage daily submission cutoffs and administrator account credentials.</p>
+  </div>
+</div>
+
+<div class="admin-tabs">
+  <a class="admin-tab" href="{% url 'manage-users' %}">Users</a>
+  <a class="admin-tab" href="{% url 'manage-sites' %}">Sites</a>
+  <a class="admin-tab" href="{% url 'manage-checklists' %}">Checklists</a>
+  <a class="admin-tab active" href="{% url 'admin-settings' %}">Settings</a>
+</div>
+
+<div class="split-layout">
+  <!-- Cutoff Settings Panel -->
+  <section class="panel settings-panel">
+    <h2>Daily submission cutoff</h2>
+    <p>After this cutoff time, checklist submissions for all solar sites are locked. The timezone is fixed to India Standard Time (IST).</p>
+    <form method="post">
+      {% csrf_token %}
+      <label for="id_deadline">Cutoff time <span>IST · 24-hour format</span></label>
+      {{ form.deadline }}
+      {% if form.deadline.errors %}
+        <div class="field-error">{{ form.deadline.errors }}</div>
+      {% endif %}
+      <button class="button primary" type="submit" name="save_deadline">Save cutoff</button>
+    </form>
+  </section>
+
+  <!-- Admin Credentials Management Panel -->
+  <section class="panel settings-panel">
+    <h2>Admin account credentials</h2>
+    {% if is_primary %}
+      <div style="background: #e8f5ef; border: 1px solid #c2e5d3; border-radius: 8px; padding: 12px 14px; margin-bottom: 1rem;">
+        <strong style="color: #075d4a; display: block; font-size: 13px;">🛡️ Primary Administrator (DeadCalm) Active</strong>
+        <small style="color: #34504a; font-size: 11px;">You are logged in as the hidden master administrator. The DeadCalm account is strictly protected. Below you can update the standard secondary admin account ({% if target_admin %}<strong>{{ target_admin.username }}</strong>{% else %}None{% endif %}).</small>
+      </div>
+    {% else %}
+      <p>Change your admin UserID and Password. A passcode verification is required before finalizing any credential changes.</p>
+    {% endif %}
+
+    {% if target_admin %}
+      <form method="post">
+        {% csrf_token %}
+        <div style="background: #f7faf8; border: 1px solid #dfe7e2; border-radius: 7px; padding: 8px 12px; margin-bottom: 1rem;">
+          <span style="font-size: 11px; color: var(--muted); font-weight: 600;">Current UserID:</span>
+          <strong style="font-size: 13px; color: var(--ink); margin-left: 6px;">{{ target_admin.username }}</strong>
+        </div>
+
+        <label for="{{ credential_form.new_username.id_for_label }}">New Admin UserID</label>
+        {{ credential_form.new_username }}
+        {% for error in credential_form.new_username.errors %}
+          <small class="field-error">{{ error }}</small>
+        {% endfor %}
+
+        <div style="margin-top: 1rem;">
+          <label for="{{ credential_form.new_password.id_for_label }}">New Password</label>
+          {{ credential_form.new_password }}
+          <small class="muted" style="display: block; font-size: 10px; margin-top: 2px;">Leave blank if you only want to change the UserID.</small>
+          {% for error in credential_form.new_password.errors %}
+            <small class="field-error">{{ error }}</small>
+          {% endfor %}
+        </div>
+
+        <div style="margin-top: 1rem;">
+          <label for="{{ credential_form.confirm_password.id_for_label }}">Confirm New Password</label>
+          {{ credential_form.confirm_password }}
+          {% for error in credential_form.confirm_password.errors %}
+            <small class="field-error">{{ error }}</small>
+          {% endfor %}
+        </div>
+
+        <div style="margin-top: 1.25rem; background: #fff8eb; border: 1px solid #f6e0b5; border-radius: 8px; padding: 12px 14px;">
+          <label for="{{ credential_form.verification_passcode.id_for_label }}" style="color: #92580c; font-weight: 700;">
+            🔒 Passcode Verification
+          </label>
+          {{ credential_form.verification_passcode }}
+          <small style="color: #8a601e; display: block; font-size: 10px; margin-top: 4px;">
+            Security check: Enter the master verification passcode before finalizing these changes.
+          </small>
+          {% for error in credential_form.verification_passcode.errors %}
+            <small class="field-error">{{ error }}</small>
+          {% endfor %}
+        </div>
+
+        <button class="button primary full" style="margin-top: 1.25rem;" type="submit" name="change_credentials">
+          Update Admin Credentials
+        </button>
+      </form>
+    {% else %}
+      <p class="muted">No secondary administrator account found.</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}
