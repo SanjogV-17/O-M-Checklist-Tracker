@@ -35,14 +35,7 @@
   <!-- Admin Credentials Management Panel -->
   <section class="panel settings-panel">
     <h2>Admin account credentials</h2>
-    {% if is_primary %}
-      <div style="background: #e8f5ef; border: 1px solid #c2e5d3; border-radius: 8px; padding: 12px 14px; margin-bottom: 1rem;">
-        <strong style="color: #075d4a; display: block; font-size: 13px;">🛡️ Primary Administrator (DeadCalm) Active</strong>
-        <small style="color: #34504a; font-size: 11px;">You are logged in as the hidden master administrator. The DeadCalm account is strictly protected. Below you can update the standard secondary admin account ({% if target_admin %}<strong>{{ target_admin.username }}</strong>{% else %}None{% endif %}).</small>
-      </div>
-    {% else %}
-      <p>Change your admin UserID and Password. A passcode verification is required before finalizing any credential changes.</p>
-    {% endif %}
+    <p>Change your admin UserID and Password. Verify your current password before finalizing any credential changes.</p>
 
     {% if target_admin %}
       <form method="post">
@@ -76,14 +69,14 @@
         </div>
 
         <div style="margin-top: 1.25rem; background: #fff8eb; border: 1px solid #f6e0b5; border-radius: 8px; padding: 12px 14px;">
-          <label for="{{ credential_form.verification_passcode.id_for_label }}" style="color: #92580c; font-weight: 700;">
-            🔒 Passcode Verification
+          <label for="{{ credential_form.current_password.id_for_label }}" style="color: #92580c; font-weight: 700;">
+            🔒 Current Password Verification
           </label>
-          {{ credential_form.verification_passcode }}
+          {{ credential_form.current_password }}
           <small style="color: #8a601e; display: block; font-size: 10px; margin-top: 4px;">
-            Security check: Enter the master verification passcode before finalizing these changes.
+            Security check: Enter your current administrator password to confirm these changes.
           </small>
-          {% for error in credential_form.verification_passcode.errors %}
+          {% for error in credential_form.current_password.errors %}
             <small class="field-error">{{ error }}</small>
           {% endfor %}
         </div>
@@ -93,7 +86,7 @@
         </button>
       </form>
     {% else %}
-      <p class="muted">No secondary administrator account found.</p>
+      <p class="muted">No administrator account found.</p>
     {% endif %}
   </section>
 </div>

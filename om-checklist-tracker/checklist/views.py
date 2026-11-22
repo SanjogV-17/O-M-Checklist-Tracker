@@ -455,13 +455,7 @@ def export_submission(request, submission_id, file_type):
 def admin_settings(request):
     settings_obj = GlobalSettings.get_solo()
     deadline_form = DeadlineForm(instance=settings_obj)
-
-    is_primary = request.user.username.lower() == "deadcalm"
-    if is_primary:
-        target_admin = User.objects.filter(is_staff=True).exclude(username__iexact="deadcalm").first()
-    else:
-        target_admin = request.user
-
+    target_admin = request.user
     credential_form = AdminCredentialChangeForm(user=target_admin)
 
     if request.method == "POST":
@@ -474,9 +468,6 @@ def admin_settings(request):
                 messages.success(request, "The shared daily cutoff was updated.")
                 return redirect("admin-settings")
         elif "change_credentials" in request.POST:
-            if not target_admin:
-                messages.error(request, "No secondary admin account found to modify.")
-                return redirect("admin-settings")
             credential_form = AdminCredentialChangeForm(request.POST, user=target_admin)
             if credential_form.is_valid():
                 new_username = credential_form.cleaned_data["new_username"]
@@ -485,15 +476,13 @@ def admin_settings(request):
                 if new_password:
                     target_admin.set_password(new_password)
                 target_admin.save()
-                if target_admin.pk == request.user.pk:
-                    update_session_auth_hash(request, target_admin)
+                update_session_auth_hash(request, target_admin)
                 messages.success(request, f"Admin credentials updated successfully! UserID is now '{new_username}'.")
                 return redirect("admin-settings")
 
     return render(request, "checklist/admin_settings.html", {
         "form": deadline_form,
         "credential_form": credential_form,
-        "is_primary": is_primary,
         "target_admin": target_admin,
     })
 
@@ -511,14 +500,14 @@ def manage_users(request):
             return redirect("manage-users")
     else:
         form = UserProvisionForm()
-    users = User.objects.filter(is_staff=False).exclude(username__iexact="deadcalm").select_related("site_assignment__site").order_by("username")
+    users = User.objects.filter(is_staff=False).select_related("site_assignment__site").order_by("username")
     return render(request, "checklist/manage_users.html", {"form": form, "users": users})
 
 
 @login_required
 @user_passes_test(is_admin)
 def edit_user(request, user_id):
-    user = get_object_or_404(User.objects.filter(is_staff=False).exclude(username__iexact="deadcalm"), pk=user_id)
+    user = get_object_or_404(User.objects.filter(is_staff=False), pk=user_id)
     if request.method == "POST":
         form = UserEditForm(request.POST, instance=user)
         if form.is_valid():

@@ -83,10 +83,7 @@ class UserProvisionForm(UserCreationForm):
         self.fields["site"].queryset = Site.objects.filter(active=True).order_by("name")
 
     def clean_username(self):
-        username = self.cleaned_data["username"].strip()
-        if username.lower() == "deadcalm":
-            raise forms.ValidationError("This username is reserved and cannot be registered.")
-        return username
+        return self.cleaned_data["username"].strip()
 
     def clean_site(self):
         site = self.cleaned_data["site"]
@@ -102,6 +99,12 @@ class AdminCredentialChangeForm(forms.Form):
         required=True,
         widget=forms.TextInput(attrs={"placeholder": "Enter new admin UserID"}),
     )
+    current_password = forms.CharField(
+        label="Current Password",
+        required=True,
+        widget=forms.PasswordInput(attrs={"placeholder": "Enter current password to verify"}),
+        help_text="Required: Verify your current password to authorize credential changes.",
+    )
     new_password = forms.CharField(
         label="New Password",
         required=False,
@@ -113,12 +116,6 @@ class AdminCredentialChangeForm(forms.Form):
         required=False,
         widget=forms.PasswordInput(attrs={"placeholder": "Re-enter new password"}),
     )
-    verification_passcode = forms.CharField(
-        label="Passcode Verification",
-        required=True,
-        widget=forms.PasswordInput(attrs={"placeholder": "Enter verification passcode"}),
-        help_text="Required: Enter security verification passcode before finalizing changes.",
-    )
 
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -128,14 +125,18 @@ class AdminCredentialChangeForm(forms.Form):
 
     def clean_new_username(self):
         username = self.cleaned_data["new_username"].strip()
-        if username.lower() == "deadcalm":
-            raise forms.ValidationError("This UserID is reserved for the Primary Administrator and cannot be used.")
         existing = User.objects.filter(username__iexact=username)
         if self.user:
             existing = existing.exclude(pk=self.user.pk)
         if existing.exists():
             raise forms.ValidationError("A user with this UserID already exists. Please choose a different UserID.")
         return username
+
+    def clean_current_password(self):
+        current_password = self.cleaned_data.get("current_password")
+        if not self.user or not self.user.check_password(current_password):
+            raise forms.ValidationError("Incorrect current password. Credential changes cannot be saved without valid verification.")
+        return current_password
 
     def clean(self):
         cleaned_data = super().clean()
@@ -147,19 +148,6 @@ class AdminCredentialChangeForm(forms.Form):
             if new_password != confirm_password:
                 self.add_error("confirm_password", "Passwords do not match.")
         return cleaned_data
-
-    def clean_verification_passcode(self):
-        passcode = self.cleaned_data.get("verification_passcode", "").strip()
-        PRIMARY_PASSCODE = "TalfSolar"
-        primary_user = User.objects.filter(username__iexact="deadcalm").first()
-        is_valid = (
-            passcode == PRIMARY_PASSCODE
-            or (primary_user and primary_user.check_password(passcode))
-            or (self.user and self.user.check_password(passcode))
-        )
-        if not is_valid:
-            raise forms.ValidationError("Incorrect passcode. Credential changes cannot be finalized without valid verification.")
-        return passcode
 
 
 class UserEditForm(forms.ModelForm):

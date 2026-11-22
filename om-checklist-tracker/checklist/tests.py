@@ -428,21 +428,7 @@ class ChecklistWorkflowTests(TestCase):
         self.assertContains(response, "Routine checks fine")
         self.assertContains(response, "Stable")
 
-    def test_primary_admin_deadcalm_hidden_and_protected(self):
-        admin = User.objects.create_superuser(username="admin", password="strong-admin-password")
-        deadcalm = User.objects.get(username="DeadCalm")
-        self.client.force_login(admin)
-
-        # Ensure DeadCalm is not in manage users list
-        users_resp = self.client.get("/manage/users/")
-        self.assertEqual(users_resp.status_code, 200)
-        self.assertNotContains(users_resp, "DeadCalm")
-
-        # Ensure editing DeadCalm returns 404
-        edit_resp = self.client.get(f"/manage/users/{deadcalm.pk}/edit/")
-        self.assertEqual(edit_resp.status_code, 404)
-
-    def test_admin_credential_change_with_valid_passcode(self):
+    def test_admin_credential_change_with_valid_current_password(self):
         admin = User.objects.create_superuser(username="admin", password="strong-admin-password")
         self.client.force_login(admin)
 
@@ -451,14 +437,14 @@ class ChecklistWorkflowTests(TestCase):
             "new_username": "site_admin",
             "new_password": "new-strong-password",
             "confirm_password": "new-strong-password",
-            "verification_passcode": "TalfSolar",
+            "current_password": "strong-admin-password",
         })
         self.assertRedirects(response, "/admin-settings/")
         admin.refresh_from_db()
         self.assertEqual(admin.username, "site_admin")
         self.assertTrue(admin.check_password("new-strong-password"))
 
-    def test_admin_credential_change_fails_with_invalid_passcode(self):
+    def test_admin_credential_change_fails_with_invalid_current_password(self):
         admin = User.objects.create_superuser(username="admin", password="strong-admin-password")
         self.client.force_login(admin)
 
@@ -467,26 +453,28 @@ class ChecklistWorkflowTests(TestCase):
             "new_username": "hacked_admin",
             "new_password": "hacked-password",
             "confirm_password": "hacked-password",
-            "verification_passcode": "wrong_passcode",
+            "current_password": "wrong-password",
         })
         self.assertEqual(response.status_code, 200)
         admin.refresh_from_db()
         self.assertEqual(admin.username, "admin")
         self.assertFalse(admin.check_password("hacked-password"))
 
-    def test_admin_cannot_rename_to_deadcalm(self):
+    def test_admin_can_update_username_only_with_current_password(self):
         admin = User.objects.create_superuser(username="admin", password="strong-admin-password")
         self.client.force_login(admin)
 
         response = self.client.post("/admin-settings/", {
             "change_credentials": "1",
-            "new_username": "DeadCalm",
+            "new_username": "new_admin_user",
             "new_password": "",
             "confirm_password": "",
-            "verification_passcode": "TalfSolar",
+            "current_password": "strong-admin-password",
         })
-        self.assertEqual(response.status_code, 200)
+        self.assertRedirects(response, "/admin-settings/")
         admin.refresh_from_db()
-        self.assertEqual(admin.username, "admin")
+        self.assertEqual(admin.username, "new_admin_user")
+        self.assertTrue(admin.check_password("strong-admin-password"))
+
 
 
