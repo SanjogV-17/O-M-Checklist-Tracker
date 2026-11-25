@@ -107,17 +107,43 @@ _HEADER_KEYWORDS = frozenset([
 
 
 def _get_dropdown_cols(ws):
-    """Detect Excel columns having list / dropdown data validation with Yes/No/OK."""
-    cols = set()
+    """
+    Detect Excel columns having list / dropdown data validation.
+    Returns a dict mapping 0-indexed column index → option string
+    (comma-separated values extracted from the validation formula).
+    Also handles:
+      - Inline list:  "\"Yes,No,OK\""  → "Yes,No,OK"
+      - Named range / cell ref: returns the raw formula1 string as-is
+    """
+    col_options = {}  # col_idx → options string
     if ws and hasattr(ws, "data_validations"):
         for dv in ws.data_validations.dataValidation:
             if dv.type == "list":
-                f1 = (dv.formula1 or "").lower()
-                if any(w in f1 for w in ["yes", "no", "ok", "pass", "true", "false"]):
-                    for rng in dv.sqref.ranges:
-                        for col_idx in range(rng.min_col, rng.max_col + 1):
-                            cols.add(col_idx - 1)  # 0-indexed
-    return cols
+                f1 = (dv.formula1 or "").strip()
+                # Strip surrounding quotes for inline lists: "\"A,B,C\"" → "A,B,C"
+                if f1.startswith('"') and f1.endswith('"'):
+                    options_str = f1[1:-1]
+                else:
+                    options_str = f1  # named range or cell ref — store raw
+                for rng in dv.sqref.ranges:
+                    for col_idx in range(rng.min_col, rng.max_col + 1):
+                        col_options[col_idx - 1] = options_str  # 0-indexed
+    return col_options
+
+
+def _classify_options(options_str):
+    """
+    Given a comma-separated option string, return (answer_type, choices_str):
+    - If only Yes/No/OK/Pass/True/False variants → BOOLEAN, choices_str=""
+    - Otherwise → CHOICES, choices_str=options_str
+    """
+    if not options_str:
+        return ChecklistItem.AnswerType.BOOLEAN, ""
+    opts_lower = {o.strip().lower() for o in options_str.split(",")}
+    boolean_words = {"yes", "no", "ok", "pass", "fail", "true", "false", "y", "n"}
+    if opts_lower and opts_lower.issubset(boolean_words):
+        return ChecklistItem.AnswerType.BOOLEAN, ""
+    return ChecklistItem.AnswerType.CHOICES, options_str
 
 
 def _is_header_row(row_texts):
@@ -243,7 +269,16 @@ def import_uploaded_excel(file_obj, template_name):
                 std = gcol("standard")
                 mth = gcol("method")
                 frq = gcol("frequency")
-                kind = _answer_type(desc, std)
+
+                # Check if this column has a dropdown validation
+                desc_col_idx = col_map.get("description")
+                dropdown_opts = dropdown_cols.get(desc_col_idx, "") if desc_col_idx is not None else ""
+                if dropdown_opts:
+                    kind, choices_str = _classify_options(dropdown_opts)
+                else:
+                    kind = _answer_type(desc, std)
+                    choices_str = ""
+
                 unit = "°C" if "temperature" in desc.lower() else ""
 
                 parsed_items.append({
@@ -254,6 +289,7 @@ def import_uploaded_excel(file_obj, template_name):
                     "method": mth,
                     "frequency": frq,
                     "answer_type": kind,
+                    "choices": choices_str,
                     "unit": unit,
                     "position": cp,
                 })
@@ -273,11 +309,13 @@ def import_uploaded_excel(file_obj, template_name):
             if matrix_header_row is None:
                 continue
 
-            # Identify check / status column
+            # Identify check / status column — now returns dict of col_idx → options_str
             check_col = None
+            check_col_options = ""
             for ci in range(len(headers)):
                 if ci in dropdown_cols:
                     check_col = ci
+                    check_col_options = dropdown_cols[ci]
                     break
             if check_col is None:
                 for ci, h in enumerate(headers):
@@ -301,7 +339,16 @@ def import_uploaded_excel(file_obj, template_name):
                 section_name = sheet_name
 
             check_name = headers[check_col] if check_col is not None and check_col < len(headers) and headers[check_col] else "Operational"
-            is_dropdown = (check_col in dropdown_cols) or any(sh in _norm(check_name) for sh in _STATUS_HINTS)
+            has_dropdown = (check_col in dropdown_cols) or any(sh in _norm(check_name) for sh in _STATUS_HINTS)
+
+            # Classify the dropdown options once for the whole column
+            if check_col_options:
+                col_kind, col_choices = _classify_options(check_col_options)
+            elif has_dropdown:
+                # Status-hint column without explicit validation → default Yes/No
+                col_kind, col_choices = ChecklistItem.AnswerType.BOOLEAN, ""
+            else:
+                col_kind, col_choices = None, ""  # will fall through to _answer_type
 
             for row in sheet.iter_rows(min_row=matrix_header_row + 1, values_only=True):
                 row = list(row)
@@ -331,7 +378,12 @@ def import_uploaded_excel(file_obj, template_name):
                 else:
                     desc = f"{item_val} - {check_name} Check"
 
-                kind = ChecklistItem.AnswerType.BOOLEAN if is_dropdown else _answer_type(desc, standard_str)
+                if col_kind is not None:
+                    kind = col_kind
+                    choices_str = col_choices
+                else:
+                    kind = _answer_type(desc, standard_str)
+                    choices_str = ""
 
                 parsed_items.append({
                     "checkpoint_no": checkpoint_counter,
@@ -341,6 +393,7 @@ def import_uploaded_excel(file_obj, template_name):
                     "method": "Visual / SCADA",
                     "frequency": "Daily",
                     "answer_type": kind,
+                    "choices": choices_str,
                     "unit": "",
                     "position": checkpoint_counter,
                 })
@@ -365,6 +418,7 @@ def import_uploaded_excel(file_obj, template_name):
                 method=it["method"],
                 frequency=it["frequency"],
                 answer_type=it["answer_type"],
+                choices=it.get("choices", ""),
                 unit=it["unit"],
                 position=it["position"],
             )

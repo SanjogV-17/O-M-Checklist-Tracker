@@ -58,6 +58,7 @@ class ChecklistItem(models.Model):
         NUMBER = "number", "Numeric reading"
         BOOLEAN = "boolean", "Yes / No"
         TEXT = "text", "Short value / text"
+        CHOICES = "choices", "Dropdown choices"
 
     template = models.ForeignKey(ChecklistTemplate, on_delete=models.CASCADE, related_name="items")
     section = models.CharField(max_length=160, blank=True)
@@ -67,9 +68,18 @@ class ChecklistItem(models.Model):
     method = models.CharField(max_length=120, blank=True)
     frequency = models.CharField(max_length=80, blank=True)
     answer_type = models.CharField(max_length=12, choices=AnswerType.choices, default=AnswerType.TEXT)
+    # Comma-separated list of allowed option values when answer_type == "choices".
+    # E.g. "Operational,Non Operational,Spare"
+    choices = models.CharField(max_length=500, blank=True)
     unit = models.CharField(max_length=40, blank=True)
     required = models.BooleanField(default=True)
     position = models.PositiveIntegerField(default=0)
+
+    def get_choices_list(self):
+        """Return a list of option strings for a 'choices' type item."""
+        if self.answer_type == self.AnswerType.CHOICES and self.choices:
+            return [c.strip() for c in self.choices.split(",") if c.strip()]
+        return []
 
     class Meta:
         ordering = ["position", "checkpoint_no"]

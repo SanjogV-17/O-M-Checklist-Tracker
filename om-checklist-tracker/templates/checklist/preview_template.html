@@ -42,7 +42,8 @@
     <strong style="font-size: 18px; margin-top: 8px;">
       {{ num_boolean }} <span style="font-size: 11px; font-weight: normal; color: var(--muted);">Boolean</span> ·
       {{ num_numeric }} <span style="font-size: 11px; font-weight: normal; color: var(--muted);">Number</span> ·
-      {{ num_text }} <span style="font-size: 11px; font-weight: normal; color: var(--muted);">Text</span>
+      {{ num_text }} <span style="font-size: 11px; font-weight: normal; color: var(--muted);">Text</span> ·
+      {{ num_choices }} <span style="font-size: 11px; font-weight: normal; color: var(--muted);">Choices</span>
     </strong>
     <small>Response formats required</small>
   </div>
@@ -108,6 +109,8 @@
                       <span class="badge" style="background: #e8f5ef; color: #18835e;">Yes / No</span>
                     {% elif item.answer_type == 'number' %}
                       <span class="badge" style="background: #edf4fa; color: #1b639e;">Number{% if item.unit %} ({{ item.unit }}){% endif %}</span>
+                    {% elif item.answer_type == 'choices' %}
+                      <span class="badge" style="background: #fff3e0; color: #b35c00;" title="{{ item.choices }}">Choices: {{ item.choices }}</span>
                     {% else %}
                       <span class="badge" style="background: #f7f7f7; color: #5a6b65;">Text</span>
                     {% endif %}

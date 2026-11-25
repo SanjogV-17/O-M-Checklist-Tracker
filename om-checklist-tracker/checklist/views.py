@@ -68,6 +68,10 @@ def _collect_checklist_values(request, items):
                 errors.append(item.checkpoint_no)
         if item.answer_type == "boolean" and value and value not in {"YES", "NO"}:
             errors.append(item.checkpoint_no)
+        if item.answer_type == "choices" and value:
+            allowed = {c.strip() for c in item.choices.split(",") if c.strip()}
+            if allowed and value not in allowed:
+                errors.append(item.checkpoint_no)
         values[str(item.id)] = {"value": value, "comment": comment}
     remarks = request.POST.get("remarks", "").strip()
     return values, remarks, sorted(set(errors))
@@ -347,6 +351,10 @@ def finalize_checklist(request):
                 errors.append(item.checkpoint_no)
         if item.answer_type == "boolean" and value and value not in {"YES", "NO"}:
             errors.append(item.checkpoint_no)
+        if item.answer_type == "choices" and value:
+            allowed = {c.strip() for c in item.choices.split(",") if c.strip()}
+            if allowed and value not in allowed:
+                errors.append(item.checkpoint_no)
     if errors:
         messages.error(request, "The saved review is no longer valid. Please review the checklist again.")
         return redirect("checklist-form")
@@ -710,6 +718,7 @@ def preview_checklist_template(request, template_id):
     num_boolean = sum(1 for item in items if item.answer_type == ChecklistItem.AnswerType.BOOLEAN)
     num_numeric = sum(1 for item in items if item.answer_type == ChecklistItem.AnswerType.NUMBER)
     num_text = sum(1 for item in items if item.answer_type == ChecklistItem.AnswerType.TEXT)
+    num_choices = sum(1 for item in items if item.answer_type == ChecklistItem.AnswerType.CHOICES)
 
     return render(request, "checklist/preview_template.html", {
         "template": template,
@@ -720,5 +729,6 @@ def preview_checklist_template(request, template_id):
         "num_boolean": num_boolean,
         "num_numeric": num_numeric,
         "num_text": num_text,
+        "num_choices": num_choices,
         "assigned_sites": template.site_checklists.all(),
     })
